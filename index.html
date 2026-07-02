@@ -1244,6 +1244,11 @@
                         <input type="text" id="fullName" placeholder="Иванов Иван Иванович" required>
                     </div>
                     <div class="form-group">
+                        <label>Email *</label>
+                        <input type="email" id="email" placeholder="example@mail.ru" required>
+                        <div class="hint">На этот email придёт подтверждение заказа</div>
+                    </div>
+                    <div class="form-group">
                         <label>Номер телефона *</label>
                         <input type="tel" id="phone" placeholder="+7 (999) 123-45-67" required>
                     </div>
@@ -1291,12 +1296,7 @@
                     <i class="fas fa-check"></i>
                 </div>
                 <h3>Сумка успешно забронирована!</h3>
-                <p>Ваш заказ принят в обработку. Ожидайте сообщения от нас в одном из мессенджеров:</p>
-                <div class="messengers">
-                    <span><i class="fab fa-telegram"></i> Telegram</span>
-                    <span><i class="fab fa-whatsapp"></i> WhatsApp</span>
-                    <span><i class="fas fa-comment"></i> Max</span>
-                </div>
+                <p>Ваш заказ принят в обработку. Письмо с подтверждением отправлено на ваш email.</p>
                 <p style="margin-top:20px;">Ваш трек-номер для отслеживания:</p>
                 <div class="track-number" id="successTrackNumber">—</div>
                 <p style="font-size:0.85rem; margin-top:15px;">Сохраните трек-номер — вы сможете отслеживать статус заказа на сайте</p>
@@ -1309,8 +1309,10 @@
 
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://cdn.emailjs.com/dist/email.min.js"></script>
 
     <script>
+        // ===== FIREBASE CONFIG =====
         const firebaseConfig = {
             databaseURL: "https://cymkiby-default-rtdb.firebaseio.com/"
         };
@@ -1322,6 +1324,18 @@
             console.log('✅ Firebase подключен');
         } catch (error) {
             console.error('❌ Ошибка Firebase:', error);
+        }
+
+        // ===== EMAILJS CONFIG =====
+        const EMAILJS_SERVICE_ID = 'service_5t1yuai';
+        const EMAILJS_TEMPLATE_ID = 'template_k9c9rb2';
+        const EMAILJS_PUBLIC_KEY = 'u6BcjRgMxMl3oKZEX';
+
+        try {
+            emailjs.init(EMAILJS_PUBLIC_KEY);
+            console.log('✅ EmailJS инициализирован');
+        } catch (error) {
+            console.error('❌ Ошибка EmailJS:', error);
         }
 
         window.addEventListener('load', () => {
@@ -1478,6 +1492,18 @@
             }
         }
 
+        function sendEmail(orderData) {
+            const templateParams = {
+                email: orderData.email,
+                to_name: orderData.fullName,
+                product_name: orderData.productName,
+                product_price: orderData.productPrice,
+                track_number: orderData.trackNumber
+            };
+
+            return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+        }
+
         function submitOrder() {
             if (!db) {
                 showToast('База данных недоступна. Попробуйте позже.', 'error');
@@ -1485,6 +1511,7 @@
             }
 
             const fullName = document.getElementById('fullName').value.trim();
+            const email = document.getElementById('email').value.trim();
             const phone = document.getElementById('phone').value.trim();
             const passport = document.getElementById('passport').value.trim();
             const country = document.getElementById('country').value;
@@ -1492,13 +1519,19 @@
             const address = document.getElementById('address').value.trim();
             const comment = document.getElementById('comment').value.trim();
 
-            if (!fullName || !phone || !passport || !country || !delivery || !address) {
+            if (!fullName || !email || !phone || !passport || !country || !delivery || !address) {
                 showToast('Пожалуйста, заполните все обязательные поля!', 'error');
                 return;
             }
 
             if (fullName.length < 5) {
                 showToast('Введите полное ФИО!', 'error');
+                return;
+            }
+
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showToast('Введите корректный email!', 'error');
                 return;
             }
 
@@ -1519,6 +1552,7 @@
                 productName: currentOrderProduct.name,
                 productPrice: currentOrderProduct.price,
                 fullName: fullName,
+                email: email,
                 phone: phone,
                 passport: passport,
                 country: country,
@@ -1538,17 +1572,19 @@
 
             db.ref('orders').push(orderData)
                 .then(() => {
+                    return sendEmail(orderData);
+                })
+                .then(() => {
                     closeModal('orderModal');
                     document.getElementById('successTrackNumber').textContent = trackNumber;
                     document.getElementById('successModal').classList.add('active');
                     document.body.style.overflow = 'hidden';
-                    showToast('Заказ успешно оформлен!', 'success');
-                    
+                    showToast('Заказ успешно оформлен! Письмо отправлено на ' + email, 'success');
                     document.getElementById('orderForm').reset();
                 })
                 .catch((error) => {
-                    console.error('Error creating order:', error);
-                    showToast('Ошибка при оформлении заказа. Попробуйте снова.', 'error');
+                    console.error('Error:', error);
+                    showToast('Заказ сохранён, но письмо не отправлено. Проверьте email.', 'error');
                 })
                 .finally(() => {
                     btn.disabled = false;
