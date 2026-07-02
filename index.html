@@ -1307,15 +1307,11 @@
 
     <div class="toast" id="toast"></div>
 
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-    
-    <!-- EmailJS SDK -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 
     <script>
-        // ===== FIREBASE CONFIG =====
         const firebaseConfig = {
             databaseURL: "https://cymkiby-default-rtdb.firebaseio.com/"
         };
@@ -1326,12 +1322,12 @@
             db = firebase.database();
             console.log('✅ Firebase подключен');
         } catch (error) {
-            console.error('❌ Ошибка Firebase:', error);
+            console.error(' Ошибка Firebase:', error);
         }
 
-        // ===== EMAILJS CONFIG =====
         (function() {
-            emailjs.init("u6BcjRgMxMl3oKZEX");
+            emailjs.init("u6BcJRgMxMl3oKZEX");
+            console.log('✅ EmailJS инициализирован');
         })();
 
         window.addEventListener('load', () => {
@@ -1554,19 +1550,19 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span> Оформление...';
 
-            // Сохраняем в Firebase
             db.ref('orders').push(orderData)
                 .then(() => {
                     console.log('✅ Заказ сохранён в Firebase');
                     
-                    // Отправляем email
                     const templateParams = {
-                        to_email: email,
+                        email: email,
                         to_name: fullName,
                         product_name: currentOrderProduct.name,
                         product_price: currentOrderProduct.price,
                         track_number: trackNumber
                     };
+
+                    console.log('📧 Отправка письма...', templateParams);
 
                     return emailjs.send('service_5t1yuai', 'template_k9c9rb2', templateParams)
                         .then((response) => {
@@ -1575,8 +1571,7 @@
                         })
                         .catch((emailError) => {
                             console.error('❌ Ошибка отправки email:', emailError);
-                            // Не выбрасываем ошибку, чтобы заказ всё равно считался успешным
-                            return null;
+                            throw emailError;
                         });
                 })
                 .then(() => {
@@ -1589,7 +1584,7 @@
                 })
                 .catch((error) => {
                     console.error('❌ Ошибка:', error);
-                    showToast('Ошибка при оформлении заказа. Попробуйте снова.', 'error');
+                    showToast('Ошибка: ' + (error.text || error.message || 'Неизвестная ошибка'), 'error');
                 })
                 .finally(() => {
                     btn.disabled = false;
