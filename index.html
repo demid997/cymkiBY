@@ -1307,9 +1307,12 @@
 
     <div class="toast" id="toast"></div>
 
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-    <script src="https://cdn.emailjs.com/dist/email.min.js"></script>
+    
+    <!-- EmailJS SDK -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 
     <script>
         // ===== FIREBASE CONFIG =====
@@ -1327,16 +1330,9 @@
         }
 
         // ===== EMAILJS CONFIG =====
-        const EMAILJS_SERVICE_ID = 'service_5t1yuai';
-        const EMAILJS_TEMPLATE_ID = 'template_k9c9rb2';
-        const EMAILJS_PUBLIC_KEY = 'u6BcjRgMxMl3oKZEX';
-
-        try {
-            emailjs.init(EMAILJS_PUBLIC_KEY);
-            console.log('✅ EmailJS инициализирован');
-        } catch (error) {
-            console.error('❌ Ошибка EmailJS:', error);
-        }
+        (function() {
+            emailjs.init("u6BcjRgMxMl3oKZEX");
+        })();
 
         window.addEventListener('load', () => {
             setTimeout(() => {
@@ -1492,18 +1488,6 @@
             }
         }
 
-        function sendEmail(orderData) {
-            const templateParams = {
-                email: orderData.email,
-                to_name: orderData.fullName,
-                product_name: orderData.productName,
-                product_price: orderData.productPrice,
-                track_number: orderData.trackNumber
-            };
-
-            return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
-        }
-
         function submitOrder() {
             if (!db) {
                 showToast('База данных недоступна. Попробуйте позже.', 'error');
@@ -1570,9 +1554,30 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner"></span> Оформление...';
 
+            // Сохраняем в Firebase
             db.ref('orders').push(orderData)
                 .then(() => {
-                    return sendEmail(orderData);
+                    console.log('✅ Заказ сохранён в Firebase');
+                    
+                    // Отправляем email
+                    const templateParams = {
+                        to_email: email,
+                        to_name: fullName,
+                        product_name: currentOrderProduct.name,
+                        product_price: currentOrderProduct.price,
+                        track_number: trackNumber
+                    };
+
+                    return emailjs.send('service_5t1yuai', 'template_k9c9rb2', templateParams)
+                        .then((response) => {
+                            console.log('✅ Письмо отправлено!', response.status, response.text);
+                            return response;
+                        })
+                        .catch((emailError) => {
+                            console.error('❌ Ошибка отправки email:', emailError);
+                            // Не выбрасываем ошибку, чтобы заказ всё равно считался успешным
+                            return null;
+                        });
                 })
                 .then(() => {
                     closeModal('orderModal');
@@ -1583,8 +1588,8 @@
                     document.getElementById('orderForm').reset();
                 })
                 .catch((error) => {
-                    console.error('Error:', error);
-                    showToast('Заказ сохранён, но письмо не отправлено. Проверьте email.', 'error');
+                    console.error('❌ Ошибка:', error);
+                    showToast('Ошибка при оформлении заказа. Попробуйте снова.', 'error');
                 })
                 .finally(() => {
                     btn.disabled = false;
